@@ -7,6 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="src\Table.fs" />
+    <Compile Include="src\Information.fs" />
+    <Compile Include="src\Syntax.fs" />
+    <Compile Include="src\Lexer.fs" />
+    <Compile Include="src\Parser.fs" />
+    <Compile Include="src\Interpret.fs" />
+    <Compile Include="test\Parser.fs" />
+    <Compile Include="test\Lexer.fs" />
+    <Compile Include="test\Interpret.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
