@@ -16,7 +16,7 @@ let SpanInfo left right =
     let pos'  = (GetInfo right).EndsAt
     Info pos pos'
 
-let Parantized f tokens =
+let ParseParantized f tokens =
     match tokens with
     | { Tag = LEFTPARENTESE } :: tokens ->
         let item, tokens = f tokens
@@ -54,7 +54,7 @@ let rec ParseValue tokens =
     | { Tag = REAL } as real :: tokens -> Val (float real.Content) real.Info, tokens
 
     | _ -> 
-        Parantized ParseExpr tokens
+        ParseParantized ParseExpr tokens
 
 
 and ParseUnary tokens =
