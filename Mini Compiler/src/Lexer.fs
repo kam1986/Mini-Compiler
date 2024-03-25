@@ -24,9 +24,24 @@ type Tag =
     | DASH
     | PROCENTAGE
     | REAL
+    | EQ // Equal
+    | NE // Not equal
+    | LE // Less than or equal
+    | LT // less than
+    | GE // greater than or equal
+    | GT // greater than
+    | NOT
     | LEFTPARENTESE
     | RIGHTPARANTESE
-
+    | LEFTBRACKET
+    | RIGHTBRACKET
+    | IF | THEN | ELSE 
+    | LET | MUT
+    | VAR
+    | LAND
+    | LOR
+    | LIMPLY
+    | TRUE | FALSE
 
 
 type [<Struct>] Token =
@@ -35,6 +50,9 @@ type [<Struct>] Token =
         Info: Info      
         Content: string 
     }   
+with
+    interface Information with
+        member T.GetInfo = T.Info
    
 let Token tag ctnt info =
         {
@@ -93,8 +111,24 @@ let LexReal src pos =
     )
 
 
-let LexOperator src pos =    
+let LexKeyWord src pos =    
     match src with
+    | '&' :: '&' :: src -> 
+        let pos' = Pos.Move pos 1
+        let token = Token LAND null (Info pos pos')
+        ValueSome(token, (src, pos'))
+    
+    | '|' :: '|' :: src -> 
+        let pos' = Pos.Move pos 1
+        let token = Token LOR null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | '-' :: '>' :: src ->        
+        let pos' = Pos.Move pos 1
+        let token = Token LIMPLY null (Info pos pos')
+        ValueSome(token, (src, pos'))
+    
+
     | '+' :: src -> 
         let token = Token PLUS null (Info pos pos)
         ValueSome(token, (src, pos))
@@ -108,9 +142,39 @@ let LexOperator src pos =
         let token = Token DASH null (Info pos pos)
         ValueSome(token, (src, pos))
 
+    | '=' :: src -> 
+        let token = Token EQ null (Info pos pos)
+        ValueSome(token, (src, pos))
+    
+   
+    | '<' :: '>' :: src ->
+        let pos' = Pos.Move pos 1
+        let token = Token NE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+    
+    | '<' :: '=' :: src ->
+        let pos' = Pos.Move pos 1
+        let token = Token LE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | '<' :: src -> 
+        let token = Token LT null (Info pos pos)
+        ValueSome(token, (src, pos))
+    
+    | '>' :: '=' :: src ->
+        let pos' = Pos.Move pos 1
+        let token = Token GE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | '>' :: src -> 
+        let token = Token GT null (Info pos pos)
+        ValueSome(token, (src, pos))
+    
     | '%' :: src ->
         let token = Token DASH null (Info pos pos)
         ValueSome(token, (src, pos))
+
+    
 
     | 'n' :: 'e' :: 'g' :: src ->
         let pos' = Pos.Move pos 2
@@ -133,14 +197,65 @@ let LexOperator src pos =
         ValueSome(token, (src, pos'))
 
     | 's' :: 'q' :: 'r' :: 't' :: src ->
-        let pos' = Pos.Move pos 4
+        let pos' = Pos.Move pos 3
         let token = Token SQRT null (Info pos pos')
         ValueSome(token, (src, pos'))
+
+    | 'l' :: 'e' :: 't' :: src ->
+        let pos' = Pos.Move pos 2
+        let token = Token LET null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | 'm' :: 'u' :: 't' :: src ->
+        let pos' = Pos.Move pos 2
+        let token = Token MUT null (Info pos pos')
+        ValueSome(token, (src, pos'))
+        
+    | 'i' :: 'f' :: src ->
+        let pos' = Pos.Move pos 1
+        let token = Token IF null (Info pos pos')
+        ValueSome(token, (src, pos'))
+        
+    | 't' :: 'h' :: 'e' :: 'n' :: src ->
+        let pos' = Pos.Move pos 3
+        let token = Token THEN null (Info pos pos')
+        ValueSome(token, (src, pos'))
+        
+    | 'e' :: 'l' :: 's' :: 'e' :: src ->
+        let pos' = Pos.Move pos 3
+        let token = Token ELSE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | 't' :: 'r' :: 'u' :: 'e' :: src ->
+        let pos' = Pos.Move pos 3
+        let token = Token TRUE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | 'f' :: 'a' :: 'l' :: 's' :: 'e' :: src ->
+        let pos' = Pos.Move pos 4
+        let token = Token FALSE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
 
     | _ -> ValueNone
     // moving the position 1 position the the right
     // minimize code size.
     |> ValueOption.map (fun (token, (src, pos)) -> token, (src, Pos.Move pos 1))
+
+
+let rec LexVar src pos =
+    let rec loop id src =
+        match src with
+        | c :: src when IsAlphaNumeric c -> loop (id + string c) src
+        | _ -> id, src
+
+    match src with
+    | c :: src when IsLower c -> 
+        let id, src = loop (string c) src 
+        let token = Token VAR id (Info pos (Pos.Move pos (id.Length-1)))
+        ValueSome(token, (src, Pos.Move pos id.Length))
+
+    | _ -> ValueNone
 
 let rec LexWhitespace src pos =
 
@@ -171,10 +286,16 @@ let LexParantese src pos =
     let pos' = Pos.Move pos 1
     match src with
     | '(' :: src -> 
-        let token = Token LEFTPARENTESE  "" (Info pos pos)
+        let token = Token LEFTPARENTESE  null (Info pos pos)
         ValueSome(token, (src, pos'))
     | ')' :: src -> 
-        let token = Token RIGHTPARANTESE "" (Info pos pos)
+        let token = Token RIGHTPARANTESE null (Info pos pos)
+        ValueSome(token, (src, pos'))
+    | '}' :: src -> 
+        let token = Token LEFTBRACKET  null (Info pos pos)
+        ValueSome(token, (src, pos'))
+    | '{' :: src -> 
+        let token = Token RIGHTBRACKET null (Info pos pos)
         ValueSome(token, (src, pos'))
     | _ -> ValueNone
 
@@ -185,8 +306,9 @@ let Src str = List.ofSeq str
 let Lex source =
     let pattern =
         LexReal <|> 
-        LexOperator <|> 
-        LexParantese
+        LexKeyWord <|> 
+        LexParantese <|>
+        LexVar
     
     let rec loop tokens src pos =
         match src with

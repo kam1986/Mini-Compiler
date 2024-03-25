@@ -54,6 +54,13 @@ with
         | Div -> "/" 
 
 
+type LogOp =
+    | Imply
+    | Or
+    | And
+
+type RelOp = Eq | Ne | Le | Lt | Ge | Gt
+
 type BinOp =
     {
         BinOp: Bin
@@ -92,19 +99,55 @@ let Binop op =
             
     }
 
-type Expr =
+type Mutability =
+    | Mut
+    | Imm
+
+// we use a generic parameter for variable names, because we at later stages need to reference to them by index
+type 'id Expr =
     | Val of float * Info
-    | Unary of UnOp * Expr ref * Info
-    | Binary of BinOp * Expr ref * Expr ref * Info
+    | Variable of Mutability * 'id * Info
+    | Unary of UnOp * 'id Expr ref * Info
+    | Binary of BinOp * 'id Expr ref * 'id Expr ref * Info
+    | Cond of 'id Cond 
+    | IfThenElse of 'id Cond * 'id Expr * 'id Expr * Info
 with
     interface Information with
         member E.GetInfo =
             match E with
             | Val(_,info)
+            | Variable(_,_,info)
             | Unary(_,_,info)
-            | Binary(_,_,_,info) -> info
+            | Binary(_,_,_,info)
+            | IfThenElse(_,_,_,info) -> info
+            | Cond c -> GetInfo c
+
+
+and 'id Cond = 
+    | Not of 'id Cond * Info
+    | Logic of LogOp * 'id Cond * 'id Cond * Info
+    | Compare of RelOp * 'id Expr * 'id Expr * Info
+    | Bool of 'id Expr // true > 0 and false = 0
+with
+    interface Information with
+        member C.GetInfo =
+            match C with
+            | Not(_,info)
+            | Logic(_,_,_,info)
+            | Compare(_,_,_,info) -> info
+            | Bool v -> GetInfo v
+
+let Not cond info = Not(cond, info)
+let Logic op left right info = Logic(op, left, right, info)
+let Compare op left right info = Compare(op, left, right, info)
+
 
 let Val v info = Val(v, info)
 let Unary op expr info = Unary(op, ref expr, info)
 let Binary op left right info = Binary(op, ref left, ref right, info)
+let Ite cond meet otherwise info = IfThenElse(cond, meet, otherwise, info)
 
+// we make 3 destinct binding functions to enhance readability
+let Var mut name info = Variable(mut, name, info)
+let Let name info = Var Imm name info
+let Mut name info = Var Mut name info

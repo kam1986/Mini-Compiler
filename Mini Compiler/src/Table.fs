@@ -35,9 +35,10 @@ with
 let inline KeyOf struct(key, _) = key
 let inline ItemOf struct(_, item: _ ref) = item.Value 
 
+let Exists key tab = List.exists (fun pair -> key = KeyOf pair) tab.Pairs
 
 // look after a specific key in the table
-let Lookup key tab =
+let TryLookup key tab =
     let rec loop pairs =
         match pairs with
         | [] -> ValueNone
@@ -46,6 +47,11 @@ let Lookup key tab =
 
     loop tab.Pairs
 
+
+// assumes the key exist and return the item
+let Lookup key tab = 
+    List.find ((=) key << KeyOf) tab.Pairs
+    |> ItemOf
 
 // add an item to the table with reference point key
 let Bind key item tab =
