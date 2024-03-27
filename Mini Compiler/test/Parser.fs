@@ -13,26 +13,29 @@ let testBinary() =
     |> Lex
     |> ParseExpr
 
-let testPrecedence1 =
+let testPrecedence1() =
     "22 + 11 * 2"
     |> Lex
     |> ParseExpr
 
-let testPrecedence2 =
+let testPrecedence2() =
     "22 * 11 - 2"
     |> Lex
     |> ParseExpr
 
 
-let testNestedExpr1 =
+let testNestedExpr1() =
     "(22 + 11) * 2"
     |> Lex
     |> ParseExpr
 
 // Error
-let testNestedExpr2 =
+let testNestedExpr2() =
     "2 * (22 + 11)"
     |> Lex
     |> ParseExpr
 
+
+let RunLex() = ()
+    
 
