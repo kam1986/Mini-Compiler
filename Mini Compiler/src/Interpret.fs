@@ -84,7 +84,7 @@
 
 *)
 module Interpret
-#nowarn "25"
+//#nowarn "25"
 
 open Syntax
 open Table
@@ -104,7 +104,7 @@ let rec InterpretExpr vtab expr =
         | Sqrt -> Val (sqrt v) info
 
     | Binary(op, left, right, info) ->
-        let (Val(left, _))= InterpretExpr vtab left.Value
+        let (Val(left, _))  = InterpretExpr vtab left.Value
         let (Val(right, _)) = InterpretExpr vtab right.Value
         match op.BinOp with
         | Add -> Val (left + right) info
@@ -113,5 +113,60 @@ let rec InterpretExpr vtab expr =
         | Div -> Val (left / right) info
         | Rem -> Val (left % right) info
 
-    
+    // in stage 2 we havn't yet implemented statements so we have no formal
+    // way of binding variables yet.
+    | Variable(id, _) -> 
+        Lookup id vtab
+        
+    | Cond c -> 
+        InterpretCond vtab c
+        |> Cond
+
+    | IfThenElse(cond, meet, otherwise, _) ->
+        match InterpretCond vtab cond with
+        | True _ -> InterpretExpr vtab meet
+        | _ -> InterpretExpr vtab otherwise
+
+
+and InterpretCond vtab cond =
+    match cond with
+    | True _ | False _ -> cond
+    | Not(cond, _) ->
+        match InterpretCond vtab cond with
+        | True info -> False info
+        | False info -> True info
+        | _ -> failwith ""
+
+    | Logic(op, left, right, info) ->
+        let left = InterpretCond vtab left
+        match op, left with
+        | And, False _
+        | Or, True _ -> left
+        | Imply, False _ -> True info
+        | Or, _ | And, _ | Imply, _ -> InterpretCond vtab right
+        
+    | Bool e ->
+        let (Val(v, info)) = InterpretExpr vtab e
+        if v <> 0. then
+            True info
+        else
+            False info
+
+    | Compare(op, left, right, info) ->
+        let (Val(left, info)) = InterpretExpr vtab left
+        let (Val(right, _)) = InterpretExpr vtab right
+        let b =
+            match op with
+            | Eq -> left =  right
+            | Ne -> left <> right
+            | Le -> left <= right
+            | Lt -> left <  right
+            | Ge -> left >= right
+            | Gt -> left >  right
+        if b then
+            True info
+        else
+            False info
+
+
 let Interpret input = InterpretExpr input
