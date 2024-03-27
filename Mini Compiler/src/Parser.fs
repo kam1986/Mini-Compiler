@@ -16,7 +16,7 @@ let SpanInfo left right =
     let pos'  = (GetInfo right).EndsAt
     Info pos pos'
 
-let Parantized f tokens =
+let ParseParantized f tokens =
     match tokens with
     | { Tag = LEFTPARENTESE } :: tokens ->
         let item, tokens = f tokens
@@ -49,12 +49,14 @@ let ParseBracket f tokens =
         printfn "expecting to find a {, but reached end of content"
         exit -1
 
+
 let rec ParseValue tokens =
     match tokens with
     | { Tag = REAL } as real :: tokens -> Val (float real.Content) real.Info, tokens
 
-    | _ -> 
-        Parantized ParseExpr tokens
+    | { Tag = VAR } as variable :: tokens -> Var variable.Content variable.Info, tokens
+
+    | _ -> ParseParantized ParseExpr tokens
 
 
 and ParseUnary tokens =
@@ -177,17 +179,6 @@ and ParseLogic tokens =
     | _ -> left, tokens
 
 
-and ParseVarBind tokens =
-    match tokens with
-    | { Tag = LET } as bind :: ({ Tag = VAR } as name) :: { Tag = EQ } :: tokens ->
-        let e, tokens = ParseExpr tokens
-        Let name.Content (Info bind.Info.StartsAt (GetInfo e).EndsAt), tokens
-
-    | { Tag = MUT } as bind :: ({ Tag = VAR } as name) :: { Tag = EQ } :: tokens ->
-        let e, tokens = ParseExpr tokens
-        Mut name.Content (Info bind.Info.StartsAt (GetInfo e).EndsAt), tokens
-    | _ -> ParseBinary tokens
-
 and ParseIfThenElse tokens =
     match tokens with
     | { Tag = IF } as start :: tokens ->
@@ -202,14 +193,26 @@ and ParseIfThenElse tokens =
             | _ -> failwith "missing 'else' in if expression"
         | _ -> failwith "missing 'then' in if expression"
 
-    | _ -> ParseVarBind tokens
+    | _ -> ParseBinary tokens
 
 and ParseExpr tokens = ParseIfThenElse tokens
 
-and ParseCond tokens = ParseLogic tokens
+and ParseCond tokens = 
+    match tokens with
+    | { Tag = TRUE } as bool :: tokens -> True bool.Info, tokens
+    | { Tag = FALSE } as bool :: tokens -> False bool.Info, tokens
+    | { Tag = LEFTPARENTESE } :: _ -> ParseParantized ParseCond tokens
+    | _ -> ParseLogic tokens
 
 let Parse tokens =
     match ParseExpr tokens with
     | e, [] -> e
     | _ -> failwith "not fully parsed"
+
+
+
+let testIf() = 
+    "false -> true "
+    |> Lex
+    |> ParseCond
 

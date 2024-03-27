@@ -292,10 +292,10 @@ let LexParantese src pos =
         let token = Token RIGHTPARANTESE null (Info pos pos)
         ValueSome(token, (src, pos'))
     | '}' :: src -> 
-        let token = Token LEFTBRACKET  null (Info pos pos)
+        let token = Token RIGHTBRACKET  null (Info pos pos)
         ValueSome(token, (src, pos'))
     | '{' :: src -> 
-        let token = Token RIGHTBRACKET null (Info pos pos)
+        let token = Token LEFTBRACKET null (Info pos pos)
         ValueSome(token, (src, pos'))
     | _ -> ValueNone
 

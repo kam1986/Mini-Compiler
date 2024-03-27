@@ -106,7 +106,7 @@ type Mutability =
 // we use a generic parameter for variable names, because we at later stages need to reference to them by index
 type 'id Expr =
     | Val of float * Info
-    | Variable of Mutability * 'id * Info
+    | Variable of 'id * Info
     | Unary of UnOp * 'id Expr ref * Info
     | Binary of BinOp * 'id Expr ref * 'id Expr ref * Info
     | Cond of 'id Cond 
@@ -116,7 +116,7 @@ with
         member E.GetInfo =
             match E with
             | Val(_,info)
-            | Variable(_,_,info)
+            | Variable(_,info)
             | Unary(_,_,info)
             | Binary(_,_,_,info)
             | IfThenElse(_,_,_,info) -> info
@@ -124,7 +124,9 @@ with
 
 
 and 'id Cond = 
-    | Not of 'id Cond * Info
+    | True  of Info
+    | False of Info
+    | Not   of 'id Cond * Info
     | Logic of LogOp * 'id Cond * 'id Cond * Info
     | Compare of RelOp * 'id Expr * 'id Expr * Info
     | Bool of 'id Expr // true > 0 and false = 0
@@ -148,6 +150,4 @@ let Binary op left right info = Binary(op, ref left, ref right, info)
 let Ite cond meet otherwise info = IfThenElse(cond, meet, otherwise, info)
 
 // we make 3 destinct binding functions to enhance readability
-let Var mut name info = Variable(mut, name, info)
-let Let name info = Var Imm name info
-let Mut name info = Var Mut name info
+let Var name info = Variable(name, info)
