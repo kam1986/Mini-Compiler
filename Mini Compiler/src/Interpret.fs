@@ -169,4 +169,4 @@ and InterpretCond vtab cond =
             False info
 
 
-let Interpret input = InterpretExpr input
+let Interpret vtab input = InterpretExpr vtab input

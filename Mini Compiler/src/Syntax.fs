@@ -139,6 +139,8 @@ with
             | Compare(_,_,_,info) -> info
             | Bool v -> GetInfo v
 
+
+
 let Not cond info = Not(cond, info)
 let Logic op left right info = Logic(op, left, right, info)
 let Compare op left right info = Compare(op, left, right, info)

@@ -11,6 +11,14 @@ open Information
 open Lexer
 open Syntax
 
+
+(*
+    we here introduce the indentation rules of Mini
+
+    a binary operator must extend to the indentation level or further of its left operand
+    
+*)
+
 let SpanInfo left right =
     let pos = (GetInfo left).StartsAt
     let pos'  = (GetInfo right).EndsAt

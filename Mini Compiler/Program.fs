@@ -3,6 +3,7 @@ open System
 
 #nowarn "25"
 
+open Test
 open Lexer
 open Parser
 open Interpret
