@@ -15,21 +15,81 @@ open Syntax
 (*
     we here introduce the indentation rules of Mini
 
-    a binary operator must extend to the indentation level or further of its left operand
+    any binary operator must extend to the indentation level or further of its left operand
     
+    the body of a declaration must be indented at least one level further than the let/mut keyword
+
+    in the if .. then .. else and when .. do .. otherwise .. the keywords 
+    must be aligned on different lines or the whole expression must be on the same line
+    and the bodies of the branches must be atleast one indentation level further than
+    if/when.
+
+    ex.
+        if cond then meet else notmeet
+
+        or
+
+        if cond then
+          meet
+        else
+          notmeet
+
+
+    while .. do .. has the same rules as if expressions when it comes to keywords, 
+    condition and body
+
+    ex.
+        while cond do body
+
+        or
+
+        while cond do
+          body
+
+        or
+
+        while
+          cond
+        do
+          body
+
+    scoping like paranteses must either be on the same line or the body
+    must be on seperate line(s) and both the starting and ending tag of the enclosing
+    must be indented at least one indentation level less than the body. 
+
+    statement sequences must either be seperated by ; when on the same line or
+    be indented at the same as the previeus statement
 *)
+
+// right shift is the same as dividing by a power of 2
+let (<!=) (left: #Information) (right: #Information) =
+    (left.GetInfo.StartsAt.Offset >>> 1) <= (right.GetInfo.StartsAt.Offset >>> 1)
+
+let (<!) (left: #Information) (right: #Information) =
+    (left.GetInfo.StartsAt.Offset >>> 1) < (right.GetInfo.StartsAt.Offset >>> 1)
+
+// different line and same offset
+let (=!) (left: #Information) (right: #Information) =
+    left.GetInfo.StartsAt.Line < right.GetInfo.StartsAt.Line &&
+    left.GetInfo.StartsAt.Offset = right.GetInfo.StartsAt.Offset
+
+let (==) (left: #Information) (right: #Information) = left.GetInfo.StartsAt.Line = right.GetInfo.StartsAt.Line
+
 
 let SpanInfo left right =
     let pos = (GetInfo left).StartsAt
     let pos'  = (GetInfo right).EndsAt
     Info pos pos'
 
-let ParseParantized f tokens =
+let rec ParseParantized f tokens =
     match tokens with
-    | { Tag = LEFTPARENTESE } :: tokens ->
+    | { Tag = LEFTPARENTESE } as lp :: tokens ->
         let item, tokens = f tokens
         match tokens with
-        | { Tag = RIGHTPARANTESE } :: tokens -> item, tokens
+        | { Tag = RIGHTPARANTESE } as rp :: tokens 
+            when (lp <! item && rp <! item) || (item == lp && item == rp) ->             
+                item, tokens
+
         | token :: _ -> 
             printfn $"at {token.Info.StartsAt} expecting to find a ) but found {token}"
             exit -1
@@ -41,12 +101,15 @@ let ParseParantized f tokens =
         exit -1
 
 
-let ParseBracket f tokens =
+and ParseBracket f tokens =
     match tokens with
-    | { Tag = LEFTBRACKET } :: tokens ->
+    | { Tag = LEFTBRACKET } as lb :: tokens ->
         let item, tokens = f tokens
         match tokens with
-        | { Tag = RIGHTBRACKET } :: tokens -> item, tokens
+        | { Tag = RIGHTBRACKET } as rb :: tokens 
+            when (lb <! item && rb <! item) || (item == lb && item == rb) ->             
+                item, tokens
+        
         | token :: _ -> 
             printfn $"at {token.Info.StartsAt} expecting to find a {'}'} but found {token.Tag}"
             exit -1
