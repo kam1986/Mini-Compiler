@@ -8,12 +8,17 @@ open Lexer
 open Parser
 open Interpret
 open Syntax
+open Table
 
 let [<EntryPoint>] Mini args =
     
 #if DEBUG
-    Test.Run()
-    
+    //Test.Run()
+    Lex "mut count = 0\nwhile count < 10 do\n  count <- count + 1\ncount"
+    |> ParseStmts
+    |> Option.map fst
+    |> Option.bind (Interpret Table.empty)
+    |> printfn "%A"
 #else
     let mutable running = true
     while running do

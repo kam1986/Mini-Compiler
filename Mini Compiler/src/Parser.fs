@@ -250,6 +250,7 @@ and ParseLogic tokens =
     | _ -> left, tokens
 
 
+// TODO need to use indentation instead of brackets
 and ParseIfThenElse tokens =
     match tokens with
     | { Tag = IF } as start :: tokens ->
@@ -275,15 +276,108 @@ and ParseCond tokens =
     | { Tag = LEFTPARENTESE } :: _ -> ParseParantized ParseCond tokens
     | _ -> ParseLogic tokens
 
+
+// we use the option type as return type to distrinquish between error and ending 
+and ParseStmt tokens =
+    match tokens with
+    | [] -> None 
+    | { Tag = LET } as dec :: ({ Tag = VAR } as id) :: { Tag = EQ } :: tokens ->
+        let body, tokens = ParseExpr tokens
+        if dec <! body then
+            Some(Declare(Imm, id.Content, body, SpanInfo dec body), tokens)
+        else
+            failwith $"body of let declaration are not indentet enough at {(GetInfo body).StartsAt}"
+
+    | { Tag = MUT } as dec :: ({ Tag = VAR } as id) :: { Tag = EQ } :: tokens ->
+        let body, tokens = ParseExpr tokens
+        if dec <! body then
+            Some(Declare(Mut, id.Content, body, SpanInfo dec body), tokens)
+        else
+            failwith $"body of mut declaration are not indentet enough at {(GetInfo body).StartsAt}"
+
+    | { Tag = VAR } as var :: { Tag = ASSIGN } :: tokens ->
+        let body, tokens = ParseExpr tokens
+        if var <! body then
+            Some(Assign(var.Content, body, SpanInfo var body), tokens)
+        else
+            failwith $"body of mut declaration are not indentet enough at {(GetInfo body).StartsAt}"
+
+    | { Tag = WHILE } as w :: tokens ->
+        let cond, tokens = ParseCond tokens
+        if not(w <! cond) then
+            failwith $"condition of the while statement at {(GetInfo cond).StartsAt} are not properly indentet"
+        else
+        match tokens with
+        | { Tag = DO } as d :: tokens ->
+            if w == d || w =! d then
+                match ParseStmts tokens with
+                | None -> failwith $"the while statement at {(GetInfo w).StartsAt} has no body"
+                | Some(body, tokens) -> 
+                    if w <! body then
+                        (While(cond, body, SpanInfo w body), tokens)
+                        |> Some
+                    else
+                        failwith "while loop missing body" 
+            else
+                failwith "do not correctly for while loop"
+        | _ -> failwith "while expression missing do keyword"
+
+    | { Tag = WHEN } as w :: tokens ->
+        let cond, tokens = ParseCond tokens
+        if not(w <! cond) then
+            failwith $"condition of the when statement at {(GetInfo cond).StartsAt} are not properly indentet"
+        else
+        match tokens with
+        | { Tag = THEN } as t :: tokens ->
+            if w == t || w =! t then
+                match ParseStmts tokens with
+                | None -> failwith $"the when statement at {(GetInfo w).StartsAt} has no body for when the condition was meet"
+                
+                | Some(meet, tokens) -> 
+                    if not(w <! meet) then
+                        failwith "the first body of the when statement are not indentet correctly"
+                    else
+                    match tokens with
+                    | { Tag = ELSE } as e :: tokens ->
+                        if not(w == e || w =! e) then
+                            failwith "the else keyword in the when statement are not correctly placed"
+                        else
+                        match ParseStmts tokens with
+                        | Some(otherwise, tokens) when w <! otherwise -> When(cond, meet, Some otherwise, SpanInfo w otherwise), tokens
+                        | _ -> When(cond, meet, None, SpanInfo w e), tokens
+                    | _ -> When(cond, meet, None, SpanInfo w meet), tokens
+                    |> Some                        
+            else
+                failwith "the then keyword are not placed synatctically correct"
+
+        | _ -> failwith "when expression missing the then keyword"
+    | _ ->
+        try
+            let ret, tokens = ParseExpr tokens
+            Some(Return(ret, GetInfo ret), tokens)
+        with
+            _ -> None
+
+// something is wrong here
+and ParseStmts tokens =
+    match ParseStmt tokens with
+    | None -> None
+    | Some(stmt, []) -> Some(stmt, [])
+    | Some(stmt, ({ Tag = ELSE } :: _ as tokens)) -> Some(stmt, tokens)
+    | Some(stmt, tokens) ->
+        match ParseStmts tokens with
+        | Some(stmts, tokens) when stmt =! stmts ->
+            (Sequence(stmt, stmts, SpanInfo stmt stmts), tokens)
+            |> Some
+            
+        | _ -> Some(stmt, tokens)
+            
+   
+
 let Parse tokens =
-    match ParseExpr tokens with
-    | e, [] -> e
-    | _ -> failwith "not fully parsed"
+    ParseStmts tokens
+    |> Option.defaultWith (fun _ -> failwith "not parsable")
 
 
 
-let testIf() = 
-    "false -> true "
-    |> Lex
-    |> ParseCond
 

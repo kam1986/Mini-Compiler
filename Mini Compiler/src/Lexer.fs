@@ -41,6 +41,11 @@ type Tag =
     | LAND
     | LOR
     | LIMPLY
+    | ASSIGN
+    | WHILE
+    | WHEN
+    | DO
+    | SEMICOLON
     | TRUE | FALSE
 
 
@@ -146,6 +151,10 @@ let LexKeyWord src pos =
         let token = Token EQ null (Info pos pos)
         ValueSome(token, (src, pos))
     
+    | '<' :: '-' :: src -> 
+        let pos' = Pos.Move pos 1
+        let token = Token ASSIGN null (Info pos pos')
+        ValueSome(token, (src, pos'))
    
     | '<' :: '>' :: src ->
         let pos' = Pos.Move pos 1
@@ -172,9 +181,7 @@ let LexKeyWord src pos =
     
     | '%' :: src ->
         let token = Token DASH null (Info pos pos)
-        ValueSome(token, (src, pos))
-
-    
+        ValueSome(token, (src, pos))    
 
     | 'n' :: 'e' :: 'g' :: src ->
         let pos' = Pos.Move pos 2
@@ -236,6 +243,21 @@ let LexKeyWord src pos =
         let token = Token FALSE null (Info pos pos')
         ValueSome(token, (src, pos'))
 
+    | 'd' :: 'o' :: src ->
+        let pos' = Pos.Move pos 1
+        let token = Token DO null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | 'w' :: 'h' :: 'i' :: 'l' :: 'e' :: src ->
+        let pos' = Pos.Move pos 4
+        let token = Token WHILE null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
+    | 'w' :: 'h' :: 'e' :: 'n' :: src ->
+        let pos' = Pos.Move pos 3
+        let token = Token WHEN null (Info pos pos')
+        ValueSome(token, (src, pos'))
+
 
     | _ -> ValueNone
     // moving the position 1 position the the right
@@ -256,6 +278,7 @@ let rec LexVar src pos =
         ValueSome(token, (src, Pos.Move pos id.Length))
 
     | _ -> ValueNone
+
 
 let rec LexWhitespace src pos =
 

@@ -134,10 +134,30 @@ with
     interface Information with
         member C.GetInfo =
             match C with
+            | True info | False info
             | Not(_,info)
             | Logic(_,_,_,info)
             | Compare(_,_,_,info) -> info
             | Bool v -> GetInfo v
+
+
+type 'id Stmt =
+    | Declare of Mutability * 'id * 'id Expr * Info
+    | Assign of 'id * 'id Expr * Info
+    | When of 'id Cond * 'id Stmt * 'id Stmt option * Info
+    | While of 'id Cond * 'id Stmt * Info
+    | Sequence of 'id Stmt * 'id Stmt * Info
+    | Return of 'id Expr * Info
+with
+    interface Information with
+        member S.GetInfo =
+            match S with
+            | Declare(_,_,_,info)
+            | Assign(_,_, info)
+            | When(_,_,_,info)
+            | While(_,_,info)
+            | Sequence(_,_,info)
+            | Return(_,info) -> info
 
 
 

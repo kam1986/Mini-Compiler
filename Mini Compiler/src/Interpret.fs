@@ -169,4 +169,50 @@ and InterpretCond vtab cond =
             False info
 
 
-let Interpret vtab input = InterpretExpr vtab input
+and InterpretStmt vtab stmt =
+    match stmt with
+    | Assign(adr, value, info) ->
+        let value = InterpretExpr vtab value
+        Update adr value vtab 
+        |> ValueOption.iter (fun _ -> ())
+        None
+
+    | When(cond, meet, otherwise, _) ->
+        match InterpretCond vtab cond with
+        | True _ -> InterpretStmt vtab meet
+        | _ -> Option.bind (InterpretStmt vtab) otherwise
+            
+    | While(cond, body, info) ->
+        let mutable run = 
+            match InterpretCond vtab cond with
+            | True _ -> true
+            | _ -> false
+        
+        while run do
+            InterpretStmt vtab body 
+            |> ignore
+            run <-
+                match InterpretCond vtab cond with
+                | True _ -> true
+                | _ -> false
+        None
+
+    | Return(ret, _) -> 
+        InterpretExpr vtab ret
+        |> Some
+
+    | Sequence(Declare(_, name, value, _), next, _) ->
+        let value = InterpretExpr vtab value
+        let vtab = Table.Bind name value vtab
+        InterpretStmt vtab next
+
+    | Sequence(first, next, _) ->
+        InterpretStmt vtab first
+        |> Option.map (fun _ -> failwith "error")
+        |> Option.orElseWith (fun _ -> InterpretStmt vtab next)
+     
+    // declarens without a following statement are semantically meaningless
+    // so we ignore them
+    | Declare _ -> None
+
+let Interpret vtab input = InterpretStmt vtab input

@@ -7,7 +7,7 @@ open Parser
 open Syntax
 open Interpret
 
-
+(*
 let testValue =
     "42"
     |> Lex
@@ -42,3 +42,4 @@ let testVariable() =
     |> Parse
     |> Interpret (Table.Bind "x" (Val 2.0 (Info (Position()) (Pos.Move (Position()) 2))) Table.empty)
     |> printfn "%A"
+*)

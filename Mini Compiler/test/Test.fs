@@ -5,5 +5,5 @@ open Test.Parser
 open Test.Interpret
 
 let Run() =
-    testVariable()
-    
+    //testVariable()
+    ()
