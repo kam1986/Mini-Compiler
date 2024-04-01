@@ -105,7 +105,8 @@ and ValidateStmt vtab stmt =
         ValidateStmt vtab !next
 
 
-
+    // OBS! this should be altered later as the types get more complex,
+    // and the syntax tree expands
     | Sequence(first, next, _) ->
         let first = ValidateStmt vtab !first
         let next = ValidateStmt vtab !next
