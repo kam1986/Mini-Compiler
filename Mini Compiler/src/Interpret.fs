@@ -123,38 +123,38 @@ let rec InterpretExpr vtab expr =
         |> Cond
 
     | IfThenElse(cond, meet, otherwise, _) ->
-        match InterpretCond vtab cond with
-        | True _ -> InterpretExpr vtab meet
-        | _ -> InterpretExpr vtab otherwise
+        match InterpretCond vtab !cond with
+        | True _ -> InterpretExpr vtab !meet
+        | _ -> InterpretExpr vtab !otherwise
 
 
 and InterpretCond vtab cond =
     match cond with
     | True _ | False _ -> cond
     | Not(cond, _) ->
-        match InterpretCond vtab cond with
+        match InterpretCond vtab !cond with
         | True info -> False info
         | False info -> True info
         | _ -> failwith ""
 
     | Logic(op, left, right, info) ->
-        let left = InterpretCond vtab left
+        let left = InterpretCond vtab !left
         match op, left with
         | And, False _
         | Or, True _ -> left
         | Imply, False _ -> True info
-        | Or, _ | And, _ | Imply, _ -> InterpretCond vtab right
+        | Or, _ | And, _ | Imply, _ -> InterpretCond vtab !right
         
     | Bool e ->
-        let (Val(v, info)) = InterpretExpr vtab e
+        let (Val(v, info)) = InterpretExpr vtab !e
         if v <> 0. then
             True info
         else
             False info
 
     | Compare(op, left, right, info) ->
-        let (Val(left, info)) = InterpretExpr vtab left
-        let (Val(right, _)) = InterpretExpr vtab right
+        let (Val(left, info)) = InterpretExpr vtab !left
+        let (Val(right, _)) = InterpretExpr vtab !right
         let b =
             match op with
             | Eq -> left =  right
@@ -169,47 +169,50 @@ and InterpretCond vtab cond =
             False info
 
 
+
+// any malformed statements are checked for before run/compile time
 and InterpretStmt vtab stmt =
     match stmt with
     | Assign(adr, value, info) ->
-        let value = InterpretExpr vtab value
+        let value = InterpretExpr vtab !value
         Update adr value vtab 
         |> ValueOption.iter (fun _ -> ())
         None
 
     | When(cond, meet, otherwise, _) ->
-        match InterpretCond vtab cond with
-        | True _ -> InterpretStmt vtab meet
-        | _ -> Option.bind (InterpretStmt vtab) otherwise
+        match InterpretCond vtab !cond with
+        | True _ -> InterpretStmt vtab !meet
+        | _ -> Option.bind (InterpretStmt vtab) !otherwise
             
     | While(cond, body, info) ->
         let mutable run = 
-            match InterpretCond vtab cond with
+            match InterpretCond vtab !cond with
             | True _ -> true
             | _ -> false
         
         while run do
-            InterpretStmt vtab body 
+            InterpretStmt vtab !body 
             |> ignore
             run <-
-                match InterpretCond vtab cond with
+                match InterpretCond vtab !cond with
                 | True _ -> true
                 | _ -> false
         None
 
     | Return(ret, _) -> 
-        InterpretExpr vtab ret
+        InterpretExpr vtab !ret
         |> Some
 
-    | Sequence(Declare(_, name, value, _), next, _) ->
-        let value = InterpretExpr vtab value
+    | Sequence({ contents = Stmt.Declare(_, name, value, _) }, next, _) ->
+        let value = InterpretExpr vtab !value
         let vtab = Table.Bind name value vtab
-        InterpretStmt vtab next
+        InterpretStmt vtab !next
+
 
     | Sequence(first, next, _) ->
-        InterpretStmt vtab first
+        InterpretStmt vtab !first
         |> Option.map (fun _ -> failwith "error")
-        |> Option.orElseWith (fun _ -> InterpretStmt vtab next)
+        |> Option.orElseWith (fun _ -> InterpretStmt vtab !next)
      
     // declarens without a following statement are semantically meaningless
     // so we ignore them

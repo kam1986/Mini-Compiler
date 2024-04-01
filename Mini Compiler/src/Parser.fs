@@ -238,8 +238,8 @@ and ParseLogic tokens =
         let right, tokens = ParseLogic tokens
         match right with
         | Logic(Imply, left', right',_) -> 
-            let left = Logic Or left left' (SpanInfo left left')
-            Logic Imply left right' (SpanInfo left right'), tokens
+            let left = Logic Or left !left' (SpanInfo left !left')
+            Logic Imply left !right' (SpanInfo left !right'), tokens
 
         | _ -> Logic Or left right (SpanInfo left right), tokens
 
@@ -264,12 +264,12 @@ and ParseIfThenElse tokens =
                 Ite cond meet otherwise (SpanInfo start otherwise), tokens
             | _ -> failwith "missing 'else' in if expression"
         | _ -> failwith "missing 'then' in if expression"
-
+        
     | _ -> ParseBinary tokens
 
 and ParseExpr tokens = ParseIfThenElse tokens
 
-and ParseCond tokens = 
+and ParseCond tokens : _ Cond * Token list= 
     match tokens with
     | { Tag = TRUE } as bool :: tokens -> True bool.Info, tokens
     | { Tag = FALSE } as bool :: tokens -> False bool.Info, tokens
@@ -284,21 +284,21 @@ and ParseStmt tokens =
     | { Tag = LET } as dec :: ({ Tag = VAR } as id) :: { Tag = EQ } :: tokens ->
         let body, tokens = ParseExpr tokens
         if dec <! body then
-            Some(Declare(Imm, id.Content, body, SpanInfo dec body), tokens)
+            Some(Declare Imm id.Content body (SpanInfo dec body), tokens)
         else
             failwith $"body of let declaration are not indentet enough at {(GetInfo body).StartsAt}"
 
     | { Tag = MUT } as dec :: ({ Tag = VAR } as id) :: { Tag = EQ } :: tokens ->
         let body, tokens = ParseExpr tokens
         if dec <! body then
-            Some(Declare(Mut, id.Content, body, SpanInfo dec body), tokens)
+            Some(Declare Mut id.Content body (SpanInfo dec body), tokens)
         else
             failwith $"body of mut declaration are not indentet enough at {(GetInfo body).StartsAt}"
 
     | { Tag = VAR } as var :: { Tag = ASSIGN } :: tokens ->
         let body, tokens = ParseExpr tokens
         if var <! body then
-            Some(Assign(var.Content, body, SpanInfo var body), tokens)
+            Some(Assign var.Content body (SpanInfo var body), tokens)
         else
             failwith $"body of mut declaration are not indentet enough at {(GetInfo body).StartsAt}"
 
@@ -314,7 +314,7 @@ and ParseStmt tokens =
                 | None -> failwith $"the while statement at {(GetInfo w).StartsAt} has no body"
                 | Some(body, tokens) -> 
                     if w <! body then
-                        (While(cond, body, SpanInfo w body), tokens)
+                        (While cond body (SpanInfo w body), tokens)
                         |> Some
                     else
                         failwith "while loop missing body" 
@@ -343,9 +343,10 @@ and ParseStmt tokens =
                             failwith "the else keyword in the when statement are not correctly placed"
                         else
                         match ParseStmts tokens with
-                        | Some(otherwise, tokens) when w <! otherwise -> When(cond, meet, Some otherwise, SpanInfo w otherwise), tokens
-                        | _ -> When(cond, meet, None, SpanInfo w e), tokens
-                    | _ -> When(cond, meet, None, SpanInfo w meet), tokens
+                        | Some(otherwise, tokens) when w <! otherwise -> 
+                            When cond meet (Some otherwise) (SpanInfo w otherwise), tokens
+                        | _ -> When cond meet None (SpanInfo w e), tokens
+                    | _ -> When cond meet None (SpanInfo w meet), tokens
                     |> Some                        
             else
                 failwith "the then keyword are not placed synatctically correct"
@@ -354,7 +355,7 @@ and ParseStmt tokens =
     | _ ->
         try
             let ret, tokens = ParseExpr tokens
-            Some(Return(ret, GetInfo ret), tokens)
+            Some (Return ret (GetInfo ret), tokens)
         with
             _ -> None
 
@@ -367,7 +368,7 @@ and ParseStmts tokens =
     | Some(stmt, tokens) ->
         match ParseStmts tokens with
         | Some(stmts, tokens) when stmt =! stmts ->
-            (Sequence(stmt, stmts, SpanInfo stmt stmts), tokens)
+            (Sequence stmt stmts (SpanInfo stmt stmts), tokens)
             |> Some
             
         | _ -> Some(stmt, tokens)

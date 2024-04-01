@@ -17,6 +17,10 @@ open Information
     
     we do though implement operations as generalized as some unary operation or binary operation marked by a prefix of types UnOp or BinOp.
     This way we can reduce rewriting and implementation of new operations later on.
+
+
+    we use reference cells to minize memory allocation and being able to change the syntax tree inline
+    in optimization and 
 *)
 
 type UnOp =
@@ -110,7 +114,7 @@ type 'id Expr =
     | Unary of UnOp * 'id Expr ref * Info
     | Binary of BinOp * 'id Expr ref * 'id Expr ref * Info
     | Cond of 'id Cond 
-    | IfThenElse of 'id Cond * 'id Expr * 'id Expr * Info
+    | IfThenElse of 'id Cond ref * 'id Expr ref * 'id Expr ref * Info
 with
     interface Information with
         member E.GetInfo =
@@ -126,10 +130,10 @@ with
 and 'id Cond = 
     | True  of Info
     | False of Info
-    | Not   of 'id Cond * Info
-    | Logic of LogOp * 'id Cond * 'id Cond * Info
-    | Compare of RelOp * 'id Expr * 'id Expr * Info
-    | Bool of 'id Expr // true > 0 and false = 0
+    | Not   of 'id Cond ref * Info
+    | Logic of LogOp * 'id Cond ref * 'id Cond ref * Info
+    | Compare of RelOp * 'id Expr ref * 'id Expr ref * Info
+    | Bool of 'id Expr ref // true > 0 and false = 0
 with
     interface Information with
         member C.GetInfo =
@@ -138,16 +142,16 @@ with
             | Not(_,info)
             | Logic(_,_,_,info)
             | Compare(_,_,_,info) -> info
-            | Bool v -> GetInfo v
+            | Bool v -> GetInfo !v
 
 
 type 'id Stmt =
-    | Declare of Mutability * 'id * 'id Expr * Info
-    | Assign of 'id * 'id Expr * Info
-    | When of 'id Cond * 'id Stmt * 'id Stmt option * Info
-    | While of 'id Cond * 'id Stmt * Info
-    | Sequence of 'id Stmt * 'id Stmt * Info
-    | Return of 'id Expr * Info
+    | Declare of Mutability * 'id * 'id Expr ref * Info
+    | Assign of 'id * 'id Expr ref * Info
+    | When of 'id Cond ref * 'id Stmt ref * 'id Stmt option ref * Info
+    | While of 'id Cond ref * 'id Stmt ref * Info
+    | Sequence of 'id Stmt ref * 'id Stmt ref * Info
+    | Return of 'id Expr ref * Info
 with
     interface Information with
         member S.GetInfo =
@@ -161,15 +165,22 @@ with
 
 
 
-let Not cond info = Not(cond, info)
-let Logic op left right info = Logic(op, left, right, info)
-let Compare op left right info = Compare(op, left, right, info)
+let Declare mut id body info = Declare(mut, id, ref body, info)
+let Assign id value info = Assign(id, ref value, info)
+let When cond meet otherwise info =  When(ref cond, ref meet, ref otherwise, info)
+let While cond body info = While(ref cond, ref body, info)
+let Sequence first next info = Sequence(ref first, ref next, info)
+let Return ret info = Return(ref ret, info)
 
+let Not cond info = Not(ref cond, info)
+let Logic op c1 c2 info = Logic(op, ref c1, ref c2, info)
+let Compare op e1 e2 info = Compare(op, ref e1, ref e2, info)
+let Bool e = Bool (ref e)
 
 let Val v info = Val(v, info)
 let Unary op expr info = Unary(op, ref expr, info)
 let Binary op left right info = Binary(op, ref left, ref right, info)
-let Ite cond meet otherwise info = IfThenElse(cond, meet, otherwise, info)
+let Ite cond meet otherwise info = IfThenElse(ref cond, ref meet, ref otherwise, info)
 
 // we make 3 destinct binding functions to enhance readability
 let Var name info = Variable(name, info)
