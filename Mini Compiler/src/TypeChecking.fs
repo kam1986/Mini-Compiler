@@ -12,12 +12,14 @@
 open Table
 open Syntax
 
-type Type = voption<bool>
-// these are a handy way to cover all current types
-// but also limit them to only them by combining two types with two options
-let real = ValueSome true  : Type
-let bool = ValueSome false : Type
-let unit = ValueNone : Type
+type Type = 
+    | Number
+    | Boolean
+    | Unit
+
+let real = Number
+let bool = Boolean
+let unit = Unit
 
 // for now this do only check that they are the same
 // this will change later to full type inference

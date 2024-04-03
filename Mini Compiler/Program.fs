@@ -9,16 +9,19 @@ open Parser
 open Interpret
 open Syntax
 open Table
+open TypeChecking
+
 
 let [<EntryPoint>] Mini args =
     
 #if DEBUG
     //Test.Run()
-    Lex "mut count = 0\nwhile count < 10 do\n  count <- count + 1\ncount"
+    Lex "21 + 21"
     |> ParseStmts
     |> Option.map fst
-    |> Option.bind (Interpret Table.empty)
-    |> printfn "%A"
+    |> Option.map (ValidateStmt Table.empty)
+    |> Option.iter (printfn "%A")
+
 #else
     let mutable running = true
     while running do

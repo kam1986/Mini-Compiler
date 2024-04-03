@@ -109,11 +109,11 @@ type Mutability =
 
 // we use a generic parameter for variable names, because we at later stages need to reference to them by index
 type 'id Expr =
-    | Val of float * Info
-    | Variable of 'id * Info
-    | Unary of UnOp * 'id Expr ref * Info
-    | Binary of BinOp * 'id Expr ref * 'id Expr ref * Info
-    | Cond of 'id Cond 
+    | Val        of float * Info
+    | Variable   of 'id * Info
+    | Unary      of UnOp * 'id Expr ref * Info
+    | Binary     of BinOp * 'id Expr ref * 'id Expr ref * Info
+    | Cond       of 'id Cond 
     | IfThenElse of 'id Cond ref * 'id Expr ref * 'id Expr ref * Info
 with
     interface Information with
