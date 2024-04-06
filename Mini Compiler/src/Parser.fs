@@ -11,6 +11,7 @@ open Information
 open Lexer
 open Syntax
 
+#nowarn "46"
 
 (*
     we here introduce the indentation rules of Mini
@@ -89,7 +90,6 @@ let rec ParseParantized f tokens =
         | { Tag = RIGHTPARANTESE } as rp :: tokens 
             when (lp <! item && rp <! item) || (item == lp && item == rp) ->             
                 item, tokens
-
         | token :: _ -> 
             printfn $"at {token.Info.StartsAt} expecting to find a ) but found {token}"
             exit -1
@@ -163,87 +163,120 @@ and ParseBinary tokens =
     let left, tokens = ParseUnary tokens
     let op =
         match tokens with
-        | { Tag = PLUS } :: tokens       -> ValueSome(Binop Add, tokens)
-        | { Tag = MINUS } :: tokens      -> ValueSome(Binop Sub, tokens)
-        | { Tag = STAR } :: tokens       -> ValueSome(Binop Mul, tokens)
-        | { Tag = DASH } :: tokens       -> ValueSome(Binop Div, tokens)
-        | { Tag = PROCENTAGE } :: tokens -> ValueSome(Binop Rem, tokens)
+        | { Tag = PLUS } as op :: tokens       when left <! op -> ValueSome(Binop Add op.Info, tokens)
+        | { Tag = MINUS } as op :: tokens      when left <! op -> ValueSome(Binop Sub op.Info, tokens)
+        | { Tag = STAR } as op :: tokens       when left <! op -> ValueSome(Binop Mul op.Info, tokens)
+        | { Tag = DASH } as op :: tokens       when left <! op -> ValueSome(Binop Div op.Info, tokens)
+        | { Tag = PROCENTAGE } as op :: tokens when left <! op -> ValueSome(Binop Rem op.Info, tokens)
         | _ -> ValueNone
     
     match op with
     | ValueSome(op, tokens) ->
         match tokens with
-        | { Tag = LEFTPARENTESE } :: _ ->
+        | { Tag = LEFTPARENTESE } as l :: _ when op <!= l ->
             let right, tokens = ParseBinary tokens
-            let info = Info (GetInfo left).StartsAt (GetInfo right).EndsAt
-            Binary op left right info, tokens
+            if op <!= right then
+                let info = Info (GetInfo left).StartsAt (GetInfo right).EndsAt
+                Binary op left right info, tokens
+            else
+                failwith $"the left an right side of the operation at {(GetInfo left).StartsAt}"
         | _ ->
         let right, tokens = ParseBinary tokens
         match right with
-        | Binary(op', left', right', info') ->
+        | Binary(op', left', right', info') when op <!= left' ->
             match compare op op' with 
             | Less -> 
                 let info = Info (GetInfo left).StartsAt (GetInfo right).EndsAt
                 Binary op left right info, tokens
             | Greater -> 
-                let info = Info (GetInfo left).StartsAt (GetInfo left'.Value).EndsAt
-                let left = Binary op left left'.Value info
+                let info = Info (GetInfo left).StartsAt (GetInfo left').EndsAt
+                let left = Binary op left left' info
                 let info = Info (GetInfo left).StartsAt info'.EndsAt
-                Binary op' left right'.Value info, tokens
+                Binary op' left right' info, tokens
             | _ -> failwith $"at {info'.StartsAt} cannot determine precedence of {op} and {op'}"
-        | _ -> 
+        | _ when op <!= right -> 
             let info = Info (GetInfo left).StartsAt (GetInfo right).EndsAt
             Binary op left right info, tokens
+        | _ -> failwith ""
     | _ -> left, tokens
 
-
+and ParseBoolean tokens =
+    match tokens with
+    | { Tag = TRUE } as bool :: tokens -> True bool.Info, tokens
+    | { Tag = FALSE } as bool :: tokens -> False bool.Info, tokens
+    | _ -> ParseRelOp tokens
 // Stage 2
 and ParseRelOp tokens =
     let left, tokens = ParseBinary tokens
     match tokens with
-    | { Tag = EQ } :: tokens ->
+    | { Tag = EQ } as op :: tokens when left <! op ->
         let right, tokens = ParseBinary tokens
-        Compare Eq left right (SpanInfo left right), tokens
+        if op <!= right then
+            Compare Eq left right (SpanInfo left right), tokens
+        else
+            failwith ""
+    | { Tag = NE } as op :: tokens when left <! op ->
+        let right, tokens = ParseBinary tokens
+        if op <!= right then
+            Compare Ne left right (SpanInfo left right), tokens
+        else
+            failwith ""
 
-    | { Tag = NE } :: tokens ->
+    | { Tag = LE } as op :: tokens when left <! op ->
         let right, tokens = ParseBinary tokens
-        Compare Ne left right (SpanInfo left right), tokens
+        if op <!= right then
+            Compare Le left right (SpanInfo left right), tokens
+        else
+            failwith ""
 
-    | { Tag = LE } :: tokens ->
+    | { Tag = LT } as op :: tokens when left <! op ->
         let right, tokens = ParseBinary tokens
-        Compare Le left right (SpanInfo left right), tokens
+        if op <!= right then
+            Compare Lt left right (SpanInfo left right), tokens
+        else
+            failwith ""
 
-    | { Tag = LT } :: tokens ->
+    | { Tag = GE } as op :: tokens when left <! op ->
         let right, tokens = ParseBinary tokens
-        Compare Lt left right (SpanInfo left right), tokens
+        if op <!= right then
+            Compare Ge left right (SpanInfo left right), tokens
+        else
+            failwith ""
 
-    | { Tag = GE } :: tokens ->
+    | { Tag = GT } as op :: tokens when left <! op ->
         let right, tokens = ParseBinary tokens
-        Compare Ge left right (SpanInfo left right), tokens
-
-    | { Tag = GT } :: tokens ->
-        let right, tokens = ParseBinary tokens
-        Compare Ge left right (SpanInfo left right), tokens
+        if op <!= right then
+            Compare Ge left right (SpanInfo left right), tokens
+        else
+            failwith ""
 
     | _ -> Bool left, tokens
 
-and ParseLogic tokens =
-    let left, tokens = ParseRelOp tokens
-    match tokens with
-    | { Tag = LAND } :: tokens ->
-        let right, tokens = ParseLogic tokens
-        Logic And left right (SpanInfo left right), tokens
 
-    | { Tag = LOR } :: tokens ->
+and ParseLogic tokens =
+    let left, tokens = ParseBoolean tokens
+    match tokens with
+    | { Tag = LAND } as op :: tokens when left <! op ->
+        let right, tokens = ParseLogic tokens
+        if op <!= right then
+            Logic And left right (SpanInfo left right), tokens
+        else
+            failwith ""
+
+    | { Tag = LOR } as op :: tokens when left <! op ->
         let right, tokens = ParseLogic tokens
         match right with
-        | Logic(Imply, left', right',_) -> 
-            let left = Logic Or left !left' (SpanInfo left !left')
-            Logic Imply left !right' (SpanInfo left !right'), tokens
+        | Logic(Imply, left', right',_) when op <!= left'-> 
+            let left = Logic Or left left' (SpanInfo left left')
+            Logic Imply left right' (SpanInfo left right'), tokens
 
-        | _ -> Logic Or left right (SpanInfo left right), tokens
-
-    | { Tag = LIMPLY } :: tokens ->
+        | Logic(Imply, _, _, _) -> failwith ""
+        | _ -> 
+            if op <!= right then
+                Logic Or left right (SpanInfo left right), tokens
+            else
+                failwith ""
+    | { Tag = LIMPLY } as op :: tokens when left <!= op ->
         let right, tokens = ParseLogic tokens
         Logic Imply left right (SpanInfo left right), tokens
         
@@ -256,23 +289,26 @@ and ParseIfThenElse tokens =
     | { Tag = IF } as start :: tokens ->
         let cond, tokens = ParseCond tokens
         match tokens with
-        | { Tag = THEN } :: tokens ->
-            let meet, tokens = ParseBracket ParseExpr tokens
+        | { Tag = THEN } as t :: tokens when start == t || t =! start ->
+            let meet, tokens = ParseExpr tokens
             match tokens with 
-            | { Tag = ELSE } :: tokens ->
-                let otherwise, tokens = ParseBracket ParseExpr tokens
+            | { Tag = ELSE } as e :: tokens when start == e || e =! start ->
+                
+                let otherwise, tokens = ParseExpr tokens
                 Ite cond meet otherwise (SpanInfo start otherwise), tokens
+            | { Tag = ELSE } as t :: _ ->
+                failwith $"the 'else' at {t.Info.StartsAt} are not placed correctly"            
             | _ -> failwith "missing 'else' in if expression"
+        | { Tag = THEN } as t :: _ ->
+            failwith $"the 'then' at {t.Info.StartsAt} are not placed correctly"
         | _ -> failwith "missing 'then' in if expression"
         
     | _ -> ParseBinary tokens
 
-and ParseExpr tokens = ParseIfThenElse tokens
+and ParseExpr tokens : _ Expr * Token list = ParseIfThenElse tokens
 
 and ParseCond tokens : _ Cond * Token list= 
     match tokens with
-    | { Tag = TRUE } as bool :: tokens -> True bool.Info, tokens
-    | { Tag = FALSE } as bool :: tokens -> False bool.Info, tokens
     | { Tag = LEFTPARENTESE } :: _ -> ParseParantized ParseCond tokens
     | _ -> ParseLogic tokens
 
@@ -373,11 +409,58 @@ and ParseStmts tokens =
             
         | _ -> Some(stmt, tokens)
             
-   
 
-let Parse tokens =
-    ParseStmts tokens
-    |> Option.defaultWith (fun _ -> failwith "not parsable")
+and ParseDeclaration tokens =
+    match tokens with
+    | { Tag = LET } as dec :: ({ Tag = VAR } as id) :: { Tag = EQ } :: tokens ->
+        let body, tokens = ParseExpr tokens
+        if dec <! body then
+            Some(VariableDec(Imm, id.Content, body, SpanInfo dec body), tokens)
+        else
+            failwith $"body of let declaration are not indentet enough at {(GetInfo body).StartsAt}"
+
+    | { Tag = MUT } as dec :: ({ Tag = VAR } as id) :: { Tag = EQ } :: tokens ->
+        let body, tokens = ParseExpr tokens
+        if dec <! body then
+            Some(VariableDec(Mut, id.Content, body, SpanInfo dec body), tokens)
+        else
+            failwith $"body of mut declaration are not indentet enough at {(GetInfo body).StartsAt}"
+
+    | { Tag = FUN } as dec :: ({ Tag = FVAR } as id) :: ({ Tag = LEFTPARENTESE } as lp :: tokens) when dec == id && dec <! lp  ->
+        let params, tokens = ParseParams tokens
+        ParseStmts tokens
+        |> Option.bind (fun (body, tokens) ->
+            if dec <! body then
+                Some(FunctionDec(id.Content, List.toArray params, body, SpanInfo dec body), tokens)
+            else
+                None
+            )
+    | _ -> None
+        
+(*
+    this is a very simple way of parsing parameters
+    we may alter this for patterns instead.
+
+    types are not covered yet.
+*)
+and ParseParams tokens =
+    let rec loop params tokens =
+        match tokens with
+        | ({ Tag = VAR } | { Tag = FVAR} as param) :: { Tag = COMMA } :: tokens -> loop (param.Content :: params) tokens
+        | ({ Tag = VAR } | { Tag = FVAR} as param) :: { Tag = RIGHTPARANTESE } :: tokens -> List.rev (param.Content :: params), tokens
+        | _ -> failwith ""
+    loop [] tokens
+
+
+and ParseDeclarations tokens =
+    ParseDeclaration tokens
+    |> Option.map (fun (dec, tokens) ->
+        let decs, tokens = ParseDeclarations tokens
+        dec :: decs, tokens)
+    |> Option.defaultValue ([],[])
+
+
+let Parse tokens = ParseDeclarations tokens
 
 
 

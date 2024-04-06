@@ -16,12 +16,9 @@ let [<EntryPoint>] Mini args =
     
 #if DEBUG
     //Test.Run()
-    Lex "21 + 21"
-    |> ParseStmts
-    |> Option.map fst
-    |> Option.map (ValidateStmt Table.empty)
-    |> Option.iter (printfn "%A")
-
+    Lex "fun Test(a)\n   if true -> false then 1 else -1"
+    |> Parse
+    |> printfn "%A"
 #else
     let mutable running = true
     while running do

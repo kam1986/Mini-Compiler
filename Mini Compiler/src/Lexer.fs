@@ -36,7 +36,8 @@ type Tag =
     | LEFTBRACKET
     | RIGHTBRACKET
     | IF | THEN | ELSE 
-    | LET | MUT
+    | LET | MUT | FUN
+    | FVAR
     | VAR
     | LAND
     | LOR
@@ -46,6 +47,8 @@ type Tag =
     | WHEN
     | DO
     | SEMICOLON
+    | COLON
+    | COMMA
     | TRUE | FALSE
 
 
@@ -179,6 +182,15 @@ let LexKeyWord src pos =
         let token = Token GT null (Info pos pos)
         ValueSome(token, (src, pos))
     
+    | ':' :: src ->
+        let token = Token COLON null (Info pos pos)
+        ValueSome(token, (src, pos))
+
+    | ',' :: src ->
+        let token = Token COMMA null (Info pos pos)
+        ValueSome(token, (src, pos))
+
+
     | '%' :: src ->
         let token = Token DASH null (Info pos pos)
         ValueSome(token, (src, pos))    
@@ -216,6 +228,11 @@ let LexKeyWord src pos =
     | 'm' :: 'u' :: 't' :: src ->
         let pos' = Pos.Move pos 2
         let token = Token MUT null (Info pos pos')
+        ValueSome(token, (src, pos'))
+    
+    | 'f' :: 'u' :: 'n' :: src ->
+        let pos' = Pos.Move pos 2
+        let token = Token FUN null (Info pos pos')
         ValueSome(token, (src, pos'))
         
     | 'i' :: 'f' :: src ->
@@ -279,6 +296,15 @@ let rec LexVar src pos =
 
     | _ -> ValueNone
 
+let rec LexFVar src pos =
+    match src with
+    | c :: src when IsUpper c ->
+        LexVar src (Pos.Move pos 1)
+        |> ValueOption.map (fun (token, rest) -> 
+            Token FVAR (string c + token.Content) (Info pos token.Info.EndsAt), rest
+        )
+    | _ -> LexVar src pos
+
 
 let rec LexWhitespace src pos =
 
@@ -331,7 +357,7 @@ let Lex source =
         LexReal <|> 
         LexKeyWord <|> 
         LexParantese <|>
-        LexVar
+        LexFVar
     
     let rec loop tokens src pos =
         match src with

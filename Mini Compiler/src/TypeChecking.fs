@@ -12,11 +12,6 @@
 open Table
 open Syntax
 
-type Type = 
-    | Number
-    | Boolean
-    | Unit
-
 let real = Number
 let bool = Boolean
 let unit = Unit
@@ -32,86 +27,86 @@ let rec ValidateExpr vtab expr =
     match expr with
     | Val _ -> real
     | Variable(name, _) -> Lookup name vtab
-    | Unary(_, body, _) -> ValidateExpr vtab !body
+    | Unary(_, body, _) -> ValidateExpr vtab body
     | Binary(_,left, right,_) ->
-        let left = ValidateExpr vtab !left
-        let right = ValidateExpr vtab !right
+        let left = ValidateExpr vtab left
+        let right = ValidateExpr vtab right
         Unify left right
     | Cond c -> 
         ValidateCond vtab c
         
     | IfThenElse(cond, meet, otherwise, _) ->
-        let cond = ValidateCond vtab !cond
+        let cond = ValidateCond vtab cond
         if cond <> bool then
             failwith ""
         else
-        let meet = ValidateExpr vtab !meet
-        let otherwise = ValidateExpr vtab !otherwise
+        let meet = ValidateExpr vtab meet
+        let otherwise = ValidateExpr vtab otherwise
         Unify meet otherwise
 
 
 and ValidateCond vtab cond = 
     match cond with
     | True _ | False _ -> bool
-    | Not(cond, info)  -> ValidateCond vtab !cond
+    | Not(cond, info)  -> ValidateCond vtab cond
     | Logic(_, left, right, _) ->
-        let left = ValidateCond vtab !left
-        let right = ValidateCond vtab !right
+        let left = ValidateCond vtab left
+        let right = ValidateCond vtab right
         if left = bool then
             Unify left right
         else
             failwith ""
 
     | Compare(op, left, right, _) ->
-        let left = ValidateExpr vtab !left
-        let right = ValidateExpr vtab !right
+        let left = ValidateExpr vtab left
+        let right = ValidateExpr vtab right
         Unify left right
         |> ignore
         bool
 
-    | Bool e -> ValidateExpr vtab !e
+    | Bool e -> ValidateExpr vtab e
 
 
 and ValidateStmt vtab stmt = 
     match stmt with
     | Assign(name, value, _) ->
-        let value = ValidateExpr vtab !value
+        let value = ValidateExpr vtab value
         let name = Lookup name vtab
         Unify name value
         |> ignore
         unit
 
     | When(cond, meet, otherwise, _) ->
-        let cond = ValidateCond vtab !cond
+        let cond = ValidateCond vtab cond
         if cond <> bool then
             failwith ""
         else
-        let meet = ValidateStmt vtab !meet
-        Option.map (ValidateStmt vtab) !otherwise
+        let meet = ValidateStmt vtab meet
+        Option.map (ValidateStmt vtab) otherwise
         |> Option.map (fun otherwise -> Unify meet otherwise)
         |> Option.defaultWith (fun _ -> Unify meet unit)
 
     | While(cond, body, _) ->
-        let cond = ValidateCond vtab !cond
+        let cond = ValidateCond vtab cond
         if cond <> bool then
             failwith ""
         else
-        let body = ValidateStmt vtab !body
+        let body = ValidateStmt vtab body
         Unify body unit
 
-    | Return(ret, _) -> ValidateExpr vtab !ret
+    | Return(ret, _) -> ValidateExpr vtab ret
 
-    | Sequence({ contents = Declare(_, name, value, _) }, next, _) ->
-        let value = ValidateExpr vtab !value
+    | Sequence(Declare(_, name, value, _), next, _) ->
+        let value = ValidateExpr vtab value
         let vtab = Bind name value vtab
-        ValidateStmt vtab !next
+        ValidateStmt vtab next
 
 
-    // OBS! this should be altered later as the types get more complex,
+    // OBS this should be altered later as the types get more complex,
     // and the syntax tree expands
     | Sequence(first, next, _) ->
-        let first = ValidateStmt vtab !first
-        let next = ValidateStmt vtab !next
+        let first = ValidateStmt vtab first
+        let next = ValidateStmt vtab next
         // we needs to differentiate between cases.
         // the first can be unit and the next can be of any type
         // or next can have a branch where it return and therefore

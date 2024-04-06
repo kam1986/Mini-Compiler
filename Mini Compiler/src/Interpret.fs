@@ -84,7 +84,7 @@
 
 *)
 module Interpret
-//#nowarn "25"
+#nowarn "25"
 
 open Syntax
 open Table
@@ -95,7 +95,7 @@ let rec InterpretExpr vtab expr =
     match expr with
     | Val _ as v -> v
     | Unary(op, e, info) ->
-        let (Val(v, _)) = InterpretExpr vtab e.Value
+        let (Val(v, _)) = InterpretExpr vtab e
         match op with
         | Neg -> Val -v info
         | Ceil -> Val (ceil v) info
@@ -104,8 +104,8 @@ let rec InterpretExpr vtab expr =
         | Sqrt -> Val (sqrt v) info
 
     | Binary(op, left, right, info) ->
-        let (Val(left, _))  = InterpretExpr vtab left.Value
-        let (Val(right, _)) = InterpretExpr vtab right.Value
+        let (Val(left, _))  = InterpretExpr vtab left
+        let (Val(right, _)) = InterpretExpr vtab right
         match op.BinOp with
         | Add -> Val (left + right) info
         | Sub -> Val (left - right) info
@@ -115,46 +115,45 @@ let rec InterpretExpr vtab expr =
 
     // in stage 2 we havn't yet implemented statements so we have no formal
     // way of binding variables yet.
-    | Variable(id, _) -> 
-        Lookup id vtab
+    | Variable(id, _) -> Lookup id vtab
         
     | Cond c -> 
         InterpretCond vtab c
         |> Cond
 
     | IfThenElse(cond, meet, otherwise, _) ->
-        match InterpretCond vtab !cond with
-        | True _ -> InterpretExpr vtab !meet
-        | _ -> InterpretExpr vtab !otherwise
+        match InterpretCond vtab cond with
+        | True _ -> InterpretExpr vtab meet
+        | _ -> InterpretExpr vtab otherwise
 
 
 and InterpretCond vtab cond =
     match cond with
     | True _ | False _ -> cond
     | Not(cond, _) ->
-        match InterpretCond vtab !cond with
+        match InterpretCond vtab cond with
         | True info -> False info
         | False info -> True info
         | _ -> failwith ""
 
     | Logic(op, left, right, info) ->
-        let left = InterpretCond vtab !left
+        let left = InterpretCond vtab left
         match op, left with
         | And, False _
         | Or, True _ -> left
         | Imply, False _ -> True info
-        | Or, _ | And, _ | Imply, _ -> InterpretCond vtab !right
+        | Or, _ | And, _ | Imply, _ -> InterpretCond vtab right
         
     | Bool e ->
-        let (Val(v, info)) = InterpretExpr vtab !e
+        let (Val(v, info)) = InterpretExpr vtab e
         if v <> 0. then
             True info
         else
             False info
 
     | Compare(op, left, right, info) ->
-        let (Val(left, info)) = InterpretExpr vtab !left
-        let (Val(right, _)) = InterpretExpr vtab !right
+        let (Val(left, info)) = InterpretExpr vtab left
+        let (Val(right, _)) = InterpretExpr vtab right
         let b =
             match op with
             | Eq -> left =  right
@@ -174,48 +173,59 @@ and InterpretCond vtab cond =
 and InterpretStmt vtab stmt =
     match stmt with
     | Assign(adr, value, info) ->
-        let value = InterpretExpr vtab !value
+        let value = InterpretExpr vtab value
         Update adr value vtab 
         |> ValueOption.iter (fun _ -> ())
         None
 
     | When(cond, meet, otherwise, _) ->
-        match InterpretCond vtab !cond with
-        | True _ -> InterpretStmt vtab !meet
-        | _ -> Option.bind (InterpretStmt vtab) !otherwise
+        match InterpretCond vtab cond with
+        | True _ -> InterpretStmt vtab meet
+        | _ -> Option.bind (InterpretStmt vtab) otherwise
             
     | While(cond, body, info) ->
         let mutable run = 
-            match InterpretCond vtab !cond with
+            match InterpretCond vtab cond with
             | True _ -> true
             | _ -> false
         
         while run do
-            InterpretStmt vtab !body 
+            InterpretStmt vtab body 
             |> ignore
             run <-
-                match InterpretCond vtab !cond with
+                match InterpretCond vtab cond with
                 | True _ -> true
                 | _ -> false
         None
 
     | Return(ret, _) -> 
-        InterpretExpr vtab !ret
+        InterpretExpr vtab ret
         |> Some
 
-    | Sequence({ contents = Stmt.Declare(_, name, value, _) }, next, _) ->
-        let value = InterpretExpr vtab !value
+    | Sequence(Stmt.Declare(_, name, value, _), next, _) ->
+        let value = InterpretExpr vtab value
         let vtab = Table.Bind name value vtab
-        InterpretStmt vtab !next
+        InterpretStmt vtab next
 
 
     | Sequence(first, next, _) ->
-        InterpretStmt vtab !first
+        InterpretStmt vtab first
         |> Option.map (fun _ -> failwith "error")
-        |> Option.orElseWith (fun _ -> InterpretStmt vtab !next)
+        |> Option.orElseWith (fun _ -> InterpretStmt vtab next)
      
     // declarens without a following statement are semantically meaningless
     // so we ignore them
     | Declare _ -> None
+
+
+and InterpretDec vtab dec =
+    match dec with
+    | VariableDec(_, name, body, _) ->
+        let v = InterpretExpr vtab body
+        None, Table.Bind name v vtab
+    
+    | FunctionDec(name, params, body, _) -> failwith "function calls and table are not yet implemented"
+
+    
 
 let Interpret vtab input = InterpretStmt vtab input

@@ -30,7 +30,7 @@ let testPrecedence1() =
     |> printfn "%A"
 
 let testIfThenElse =
-    "if true then { 42 } else { 0 }"
+    "if true then 42 else 0 "
     |> Lex
     |> Parse
     |> Interpret Table.empty
